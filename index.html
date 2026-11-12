@@ -167,6 +167,20 @@ footer a{display:block;margin:5px 0}
 footer a:hover{color:var(--text)}
 .disclaimer{margin-top:28px;font-size:12.5px;color:#666c88}
 
+.profile-card{padding:0;overflow:hidden}
+.profile-card>*:not(.pc-banner){margin-left:22px;margin-right:22px}
+.profile-card>:last-child{margin-bottom:22px}
+.pc-banner{height:64px;margin:0!important}
+.pc-top{margin-top:-28px!important;align-items:flex-end!important}
+.pc-top .avatar{border:4px solid var(--card);box-sizing:content-box}
+.pc-top>div{padding-top:32px}
+.pm-head-b>div{padding-top:42px}
+.pm-banner{height:110px;margin:-26px -26px 0;border-radius:20px 20px 0 0}
+.pm-head-b{margin-top:-36px;align-items:flex-end}
+.pm-head-b .avatar{border:5px solid var(--bg-2);box-sizing:content-box}
+.pm-head-b .x{align-self:flex-start;margin-top:44px}
+.preview-box{margin:6px 0 16px}
+.preview-box summary{cursor:pointer;color:var(--muted);font-size:13.5px}
 .admin-box{margin-top:18px;border:1px dashed #5962fe66;border-radius:14px;padding:4px 14px 12px;background:#5962fe0a}
 .admin-box summary{cursor:pointer;font-size:12.5px;font-weight:600;color:#aab0ff;text-transform:uppercase;letter-spacing:.06em;padding:8px 0}
 .act-pill{position:fixed;left:16px;bottom:16px;z-index:25;display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:#11131ecc;border:1px solid var(--line);color:var(--muted);font-size:12px;opacity:.6;transition:.2s;backdrop-filter:blur(6px)}
@@ -426,6 +440,9 @@ const D = {
     p4:{level:"Confirmé",skill_levels:{"FiveM":"Expérimenté","Modération":"Confirmé"},languages:{"Français":"Expérimenté","Anglais":"Débutant"},schedule:["lun:soir","mar:soir","mer:soir","jeu:soir","ven:nuit","sam:nuit"],paid_modes:["Bénévole"],rate:"",about:"Staff RP depuis 3 ans : whitelist, gestion des plaintes, scènes et événements. Je connais bien les règles RP et l'organisation d'un staff."},
     p5:{level:"Intermédiaire",skill_levels:{"Animation / events":"Confirmé","Community manager":"Intermédiaire"},languages:{"Français":"Expérimenté","Espagnol":"Intermédiaire"},schedule:["ven:soir","sam:soir","dim:aprem"],paid_modes:["Bénévole"],rate:"",about:"J'anime des soirées jeux, quiz et giveaways pour faire vivre les serveurs."},
   };
+  const acc={demo:"#5962FE",p1:"#17A2B8",p2:"#E4572E",p4:"#2BB673",p6:"#C04CFD"};
+  D.profiles.forEach(p=>{ if(acc[p.id]) p.accent_color=acc[p.id]; });
+  D.profiles.find(p=>p.id==="p6").was_validated=true;
   D.profiles.forEach(p=>Object.assign(p,{skill_levels:{},languages:{"Français":"Expérimenté"},schedule:[],paid_modes:[p.paid==="Bénévole"?"Bénévole":"Rémunéré"],about:""},ex[p.id]||{}));
   const st={1:{tags:["RP","FiveM","GTA"],bots:6,channels:58,roles:41,boosts:14,boost_tier:2,guild_created_at:"2024-03-02",messages_24h:3120},
             2:{tags:["Dev","Entraide"],bots:4,channels:35,roles:18,boosts:7,boost_tier:1,guild_created_at:"2022-09-14",messages_24h:1840},
@@ -606,7 +623,7 @@ const api = {
   },
   async decide(table,id,status,reason){
     if(DEMO){ const x=D[T[table]].find(r=>r.id==id); x.status=status; x.refusal_reason=reason||null; demoLog(table==="hub_servers"?"serveur":"profil",(status==="valide"?(table==="hub_servers"?"Nouveau serveur vérifié : ":"Nouveau profil vérifié : "):`${status} : `)+x.name,status==="valide"); return done(null,status==="valide"?"Validé":status==="suspendu"?"Suspendu":"Refusé : la personne est prévenue sur Discord"); }
-    const {error}=await sb.from(table).update({status,refusal_reason:reason||null,notified_staff:true}).eq("id",id);
+    const {error}=await sb.from(table).update({status,refusal_reason:reason||null,notified_staff:true,decided_by:`${state.me?.name||"admin"} (site)`}).eq("id",id);
     return done(error,status==="valide"?"Validé":"Refusé : la personne est prévenue sur Discord");
   },
   async setField(table,id,patch){
@@ -705,6 +722,18 @@ function sysBadges(P,opts={}){
 const LV_COLORS={"Débutant":"#9AA0B8","Intermédiaire":"#17A2B8","Confirmé":"#5962FE","Expérimenté":"#F5B942"};
 const levelTag = l => l ? SB(esc(l), LV_COLORS[l]||"#9AA0B8") : "";
 const paidText = t => { const m=(t.paid_modes&&t.paid_modes.length)?t.paid_modes:(t.paid?[t.paid]:[]); return m.length?m.map(esc).join(" et "):"Non précisé"; };
+function avatarHtml(t,size=48){
+  const url=t?.avatar_url||"";
+  return /^https:\/\/cdn\.discordapp\.com\//.test(url)
+    ? `<img class="avatar" src="${esc(url)}" alt="" style="width:${size}px;height:${size}px">`
+    : `<span class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.38)}px;background:${color(t?.name)}">${initials(t?.name)}</span>`;
+}
+function bannerStyle(t){
+  const url=t?.banner_url||"";
+  if(/^https:\/\/cdn\.discordapp\.com\//.test(url)) return `background:url('${esc(url)}') center/cover`;
+  const c=safeColor(t?.accent_color)!=="#5962FE"||t?.accent_color?safeColor(t.accent_color):null;
+  return c?`background:linear-gradient(120deg,${c},${c}99)`:`background:linear-gradient(120deg,${color(t?.name)},${color((t?.name||"")+"x")})`;
+}
 function scheduleTable(sel,editable){
   const set=new Set(sel||[]);
   return `<table class="sched"><thead><tr><th></th>${DAYS.map(([,l])=>`<th>${l}</th>`).join("")}</tr></thead><tbody>
@@ -784,7 +813,8 @@ function listingCard(l,mine){
 function talentCard(t,B){
   const sk=Object.entries(t.skill_levels||{});
   return `<div class="card profile-card clickable" data-open-profile="${esc(t.id)}">
-    <div class="top"><span class="avatar" style="background:${color(t.name)}">${initials(t.name)}</span>
+    <div class="pc-banner" style="${bannerStyle(t)}"></div>
+    <div class="top pc-top">${avatarHtml(t,56)}
       <div><h3>${esc(t.name)}</h3><div class="stars">★ ${esc(t.rating||"–")} <span class="muted">(${esc(t.reviews||0)} avis)</span></div></div></div>
     <div class="tags" style="margin-bottom:8px">${sysBadges(B.people?.get(String(t.id)))}${customBadges(B,"profile",t.id)}</div>
     <div class="tags" style="margin-bottom:10px">${sk.length?sk.map(([k,v])=>`<span class="tag">${esc(k)} · <b style="color:${LV_COLORS[v]||"inherit"}">${esc(v)}</b></span>`).join(""):(t.skills||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("")}</div>
@@ -852,7 +882,7 @@ async function renderActivity(){
 function profileModal(t,B){
   const P=B.people?.get(String(t.id)); const sk=Object.entries(t.skill_levels||{}), lg=Object.entries(t.languages||{});
   const mine=state.user&&String(t.id)===String(state.me?.id||(DEMO?"demo":""));
-  return `<div class="pm-head"><span class="avatar" style="width:58px;height:58px;font-size:21px;background:${color(t.name)}">${initials(t.name)}</span>
+  return `<div class="pm-banner" style="${bannerStyle(t)}"></div><div class="pm-head pm-head-b">${avatarHtml(t,72)}
       <div style="flex:1"><h3 style="margin:0">${esc(t.name)}</h3><div class="stars">★ ${esc(t.rating||"–")} <span class="muted">(${esc(t.reviews||0)} avis)${t.level?` · Niveau global : ${esc(t.level)}`:""}</span></div></div>
       <button class="x" data-close aria-label="Fermer">✕</button></div>
     <div class="tags" style="margin:14px 0">${sysBadges(P)}${customBadges(B,"profile",t.id)}</div>
@@ -1107,6 +1137,9 @@ async function vEspace(sub){
   if(sub==="profil"){
     body=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Mon profil</h2>${pill(me.status)}</div>
     <div class="tags" style="margin:10px 0">${sysBadges(myB)}${customBadges(B,"profile",me.id)}</div>
+    <details class="preview-box"><summary>Aperçu de ta carte sur la page Talents</summary>
+      <div style="max-width:380px;margin-top:12px">${talentCard({...me,exp:me.bio,rating:me.rating||"–",reviews:me.reviews||0},B)}</div>
+      <p class="muted" style="font-size:12.5px;margin-top:8px">Ton avatar et ta bannière viennent de ton compte Discord et se mettent à jour tout seuls (à ta connexion et toutes les quelques heures).</p></details>
     ${me.status==="refuse"&&me.refusal_reason?`<div class="notice bad-notice" style="margin:10px 0">Refusé par le staff : ${esc(me.refusal_reason)}. Corrige et enregistre pour renvoyer en vérification.</div>`:""}
     <p class="muted" style="margin:8px 0 18px">Ton profil est visible après vérification par le staff. Seul ton pseudo est affiché : pas de vrai nom, d'âge ni de ville. Pas de lien dans la présentation (utilise le champ portfolio).</p>
     <form class="card form-grid" data-profile>
@@ -1188,7 +1221,7 @@ async function vAdmin(sub){
   if(sub==="serveurs"){
     body=`<h2>Serveurs à vérifier</h2><p class="muted" style="margin:6px 0 18px">Nouvelles fiches et fiches modifiées. Les mêmes demandes arrivent dans le salon de vérification du Discord, avec des boutons.</p>
     <div class="grid">${ps.length?ps.map(s=>`<div class="card">
-      <div style="display:flex;gap:12px;align-items:center">${srvIcon(s.name,44)}<div><h3>${esc(s.name)}</h3><div class="muted" style="font-size:13.5px">${esc(s.cat||"Sans catégorie")} · ${fmt(s.members)} membres · envoyée le ${esc(date(s.updated_at||s.created_at))||"—"}</div></div></div>
+      <div style="display:flex;gap:12px;align-items:center">${srvIcon(s.name,44)}<div><h3>${esc(s.name)} ${s.was_validated?`<span class="tag gold">Modification</span>`:`<span class="tag brand">Nouvelle fiche</span>`}</h3><div class="muted" style="font-size:13.5px">${esc(s.cat||"Sans catégorie")} · ${fmt(s.members)} membres · envoyée le ${esc(date(s.updated_at||s.created_at))||"—"}</div></div></div>
       <div class="tags" style="margin:12px 0">${s.owner_verified?`<span class="tag ok">Propriétaire vérifié</span>`:`<span class="tag gold">Gestionnaire (pas propriétaire)</span>`}${s.has_link?`<span class="tag bad">⚠ Lien détecté dans la description</span>`:`<span class="tag ok">Aucun lien</span>`}</div>
       <p style="font-size:14.5px;white-space:pre-wrap">${esc(s.description)||`<span class="muted">Pas de description</span>`}</p>
       ${s.invite_url?`<p class="muted" style="font-size:13.5px;margin-top:6px">Invitation : ${esc(s.invite_url)} ${INVITE_RE.test(s.invite_url)?"":`<span class="tag bad">format invalide</span>`}</p>`:""}
@@ -1197,7 +1230,7 @@ async function vAdmin(sub){
   } else if(sub==="profils"){
     body=`<h2>Profils à vérifier</h2><p class="muted" style="margin:6px 0 18px">Nouveaux profils et profils modifiés.</p>
     <div class="grid">${pp.length?pp.map(p=>`<div class="card">
-      <div style="display:flex;gap:12px;align-items:center"><span class="avatar" style="width:44px;height:44px;background:${color(p.name)}">${initials(p.name)}</span><div><h3>${esc(p.name)}</h3><div class="muted" style="font-size:13.5px">${esc(p.kind)} · ${esc((p.skills||[]).join(", ")||"aucune compétence")}</div></div></div>
+      <div style="display:flex;gap:12px;align-items:center">${avatarHtml(p,44)}<div><h3>${esc(p.name)} ${p.was_validated?`<span class="tag gold">Modification</span>`:`<span class="tag brand">Nouveau</span>`}</h3><div class="muted" style="font-size:13.5px">${esc(p.kind)} · ${esc((p.skills||[]).join(", ")||"aucune compétence")}</div></div></div>
       <div class="tags" style="margin:12px 0">${p.has_link?`<span class="tag bad">⚠ Lien détecté dans la présentation</span>`:`<span class="tag ok">Aucun lien</span>`}${p.portfolio?`<span class="tag">Portfolio : ${esc(p.portfolio)}</span>`:""}</div>
       <p style="font-size:14.5px;white-space:pre-wrap">${esc(p.bio)||`<span class="muted">Pas de présentation</span>`}</p>
       <p class="muted" style="font-size:13.5px;margin-top:6px">${esc(p.paid)} · ${esc(p.dispo)}</p>
@@ -1216,7 +1249,7 @@ async function vAdmin(sub){
     <div class="grid">${fs.map(s=>`<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${srvIcon(s.name,36)}<h3 style="flex:1">${esc(s.name)}</h3><button class="btn btn-ghost btn-sm" data-open-server="${esc(s.id)}">Voir la fiche</button></div>
       ${adminServerTools(s,B)}</div>`).join("")||`<div class="empty">Aucun serveur.</div>`}</div>
     <h3 style="margin:28px 0 10px">Membres (${fp.length})</h3>
-    <div class="grid">${fp.map(p=>`<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="avatar" style="background:${color(p.name)}">${initials(p.name)}</span><h3 style="flex:1">${esc(p.name)} ${p.is_admin?`<span class="tag brand">Admin</span>`:""}</h3><button class="btn btn-ghost btn-sm" data-open-profile="${esc(p.id)}">Voir le profil</button></div>
+    <div class="grid">${fp.map(p=>`<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${avatarHtml(p,36)}<h3 style="flex:1">${esc(p.name)} ${p.is_admin?`<span class="tag brand">Admin</span>`:""}</h3><button class="btn btn-ghost btn-sm" data-open-profile="${esc(p.id)}">Voir le profil</button></div>
       <div class="tags" style="margin-top:10px">${sysBadges(B.people.get(String(p.id)))}</div>
       ${adminProfileTools(p,B)}</div>`).join("")||`<div class="empty">Aucun membre.</div>`}</div>`;
   } else if(sub==="badges"){

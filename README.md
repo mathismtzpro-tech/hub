@@ -64,7 +64,7 @@ update public.hub_profiles set is_admin = true, status = 'valide' where discord_
 ## Étape 7 — Le bot Protect
 
 **Côté Discord, sur le serveur du Hub, crée :**
-- **Salons privés staff** : `#vérif-serveurs`, `#vérif-profils` et `#commandes-studio`.
+- **Salons privés staff** : `#vérif-serveurs`, `#vérif-profils`, `#logs-vérifications` (les demandes traitées y sont rangées avec le verdict) et `#commandes-studio`.
 - **Trois catégories pour les contrats** : « Contrats en attente », « Contrats » et « Contrats archivés ». Elles doivent être invisibles pour @everyone et visibles pour le rôle staff. Le bot crée les tickets dedans et y ajoute les deux membres.
 - **Un salon forum** `#je-recrute`, avec les tags Modération, Dev bot, Graphisme, FiveM et Community manager. Le bot les applique tout seul.
 - **Les rôles** des badges. Place le rôle de Protect **au-dessus** de tous ces rôles, sinon il ne pourra pas les donner.
@@ -84,7 +84,7 @@ update public.hub_profiles set is_admin = true, status = 'valide' where discord_
 | Fichier | Action |
 | --- | --- |
 | `hub_sync.py` | **Nouveau** : place-le à côté de tes autres cogs |
-| `.env` | **À compléter** : copie dedans les lignes de `.env.exemple` (voir juste en dessous) |
+| `.env` | **À compléter** : copie dedans les lignes de `.env.exemple` (voir juste en dessous). Les variables du Hub commencent par `HUB_` : ne touche pas à `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` du dashboard |
 | Fichier principal du bot | **À modifier** : ajoute une ligne de chargement, voir ci-dessous |
 | Tous les autres fichiers | **À ne pas toucher** |
 
@@ -147,6 +147,18 @@ Pour les serveurs qui ont Protect, le bot met à jour toutes les 10 minutes :
 - une courbe des membres sur 30 jours.
 
 Sans Protect, la fiche affiche les membres et les membres en ligne, mis à jour à chaque connexion du fondateur, et en direct si le lien d'invitation est renseigné.
+
+## Le journal d'activité
+
+La base de données note toute seule ce qui se passe sur le site : validations, refus, badges, annonces, contrats, commandes et nouveaux membres. Personne ne peut écrire dans le journal à la main.
+
+- **Coin « Activité »**, en bas à gauche du site, très discret : tout le monde y voit les actualités publiques (nouveau serveur vérifié, nouvelle annonce, contrat signé, badge reçu…). La Team Hub peut basculer sur « Tout (staff) ».
+- **Panneau admin > Journal** : tout le journal, avec qui a fait quoi, et des filtres par type.
+
+## Les outils admin
+
+- Sur **chaque profil et chaque fiche serveur**, un bloc « Outils admin », que seuls les admins voient, permet de valider, refuser ou suspendre, de changer la formule, de donner les certifications et les quêtes, et d'ajouter les badges personnalisés.
+- **Panneau admin > Membres et serveurs** liste tout le monde, quel que soit le statut, avec une recherche et des filtres (en attente, à compléter, refusés, suspendus…).
 
 ## Les badges
 
