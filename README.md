@@ -65,6 +65,7 @@ update public.hub_profiles set is_admin = true, status = 'valide' where discord_
 
 **Côté Discord, sur le serveur du Hub, crée :**
 - **Salons privés staff** : `#vérif-serveurs`, `#vérif-profils` et `#commandes-studio`.
+- **Trois catégories pour les contrats** : « Contrats en attente », « Contrats » et « Contrats archivés ». Elles doivent être invisibles pour @everyone et visibles pour le rôle staff. Le bot crée les tickets dedans et y ajoute les deux membres.
 - **Un salon forum** `#je-recrute`, avec les tags Modération, Dev bot, Graphisme, FiveM et Community manager. Le bot les applique tout seul.
 - **Les rôles** des badges. Place le rôle de Protect **au-dessus** de tous ces rôles, sinon il ne pourra pas les donner.
 
@@ -112,6 +113,8 @@ Ne publie jamais ce fichier sur GitHub : il contient la clé service_role.
 await bot.load_extension("hub_sync")   # ou "cogs.hub_sync" si tes cogs sont dans un dossier cogs/
 ```
 
+Le bot a besoin des permissions **Gérer les salons** et **Gérer les rôles** sur le serveur du Hub (pour créer et déplacer les tickets de contrat).
+
 L'intent **Members** doit être activé (Developer Portal > Bot > Privileged Gateway Intents, et `intents.members = True`) pour que le bot puisse donner les rôles.
 
 ## Comment ça tourne ensuite
@@ -124,6 +127,26 @@ L'intent **Members** doit être activé (Developer Portal > Bot > Privileged Gat
 6. **Les droits sont revérifiés à chaque connexion.** Si quelqu'un perd ses droits sur un serveur, sa fiche est suspendue.
 
 Les mêmes étapes valent pour les profils, avec `#vérif-profils`.
+
+## Les contrats
+
+1. **Le fondateur propose un contrat.** Il le fait depuis une candidature reçue (*Annonces et candidatures*) ou depuis le profil d'un membre, et remplit la durée, la date de début, la période d'essai, l'engagement, les horaires, la rémunération, les missions et les conditions.
+2. **Protect ouvre un ticket privé** `#contrat-n-pseudo` dans « Contrats en attente », avec les deux membres et la Team Hub. Le ticket contient l'embed du contrat, le lien des règles et les boutons **Accepter**, **Refuser**, **Annuler** et **Signaler**.
+3. **Accepté :** le ticket passe dans « Contrats » et reste ouvert. Les boutons deviennent **Terminer** et **Signaler**.
+4. **Refusé, annulé, terminé ou rompu :** le ticket passe dans « Contrats archivés », en lecture seule pour les deux membres. Chacun peut ensuite laisser un avis sur le site.
+5. **À la date de fin prévue,** le contrat se termine tout seul.
+6. **Partout en même temps :** le site (*Mes contrats*, *Panneau admin > Contrats*) et le ticket sont synchronisés, et les deux membres sont prévenus en message privé.
+
+Sécurité : seul le membre recruté peut accepter, seul le fondateur peut annuler, et un fondateur ne peut pas avoir plus de 5 propositions en attente.
+
+## Les statistiques des serveurs
+
+Pour les serveurs qui ont Protect, le bot met à jour toutes les 10 minutes :
+- les membres, les membres en ligne, les bots, les salons, les rôles et les boosts ;
+- les messages des dernières 24 h ;
+- une courbe des membres sur 30 jours.
+
+Sans Protect, la fiche affiche les membres et les membres en ligne, mis à jour à chaque connexion du fondateur, et en direct si le lien d'invitation est renseigné.
 
 ## Les badges
 

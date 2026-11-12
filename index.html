@@ -167,6 +167,18 @@ footer a{display:block;margin:5px 0}
 footer a:hover{color:var(--text)}
 .disclaimer{margin-top:28px;font-size:12.5px;color:#666c88}
 
+.umenu{position:relative}
+.umenu .caret{font-size:11px;color:var(--muted);margin-left:2px}
+.umenu .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);display:inline-block}
+.umenu-list{display:none;position:absolute;right:0;top:calc(100% + 8px);min-width:250px;background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:8px;box-shadow:0 18px 40px #0008;z-index:30}
+.umenu-list.open{display:block}
+.umenu-head{display:flex;gap:10px;align-items:center;padding:8px 10px 12px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.umenu-head .avatar{width:38px;height:38px}
+.umenu-head small{display:block;margin-top:3px}
+.umenu-list a{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;font-size:14px;color:var(--muted)}
+.umenu-list a:hover{background:var(--card);color:var(--text)}
+.umenu-list a.danger{color:#ff7a7a;border-top:1px solid var(--line);border-radius:0 0 9px 9px;margin-top:6px}
+img.avatar{object-fit:cover}
 .modal.wide{max-width:720px}
 .clickable{cursor:pointer;transition:border-color .15s,transform .15s}.clickable:hover{border-color:var(--brand);transform:translateY(-2px)}
 .clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -276,7 +288,7 @@ const CONFIG = {
   SUPABASE_URL: "https://yfhtpxtjckrgqzzvbmpq.supabase.co",          // ex : https://xxxx.supabase.co (le même projet que ton dashboard Protect)
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHRweHRqY2tyZ3F6enZibXBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MDM3MjYsImV4cCI6MjExMDA3OTcyNn0.3qZYG4Gd--te1iiaVxbN3MoL1eum3VXaTPr3YJNqTJw",     // Supabase > Settings > API > clé "anon public"
   DISCORD_INVITE: "https://discord.gg/6xN2rx932w", // invitation du serveur du Hub
-  PROTECT_INVITE: "https://discord.com/oauth2/authorize?client_id=1558936291784269924",        // lien d'ajout du bot Protect (Discord Developer Portal > OAuth2 > URL Generator)
+  PROTECT_INVITE: "https://discord.com/oauth2/authorize?client_id=1558936291784269924&permissions=8&scope=bot+applications.commands",        // lien d'ajout du bot Protect
   HUB_GUILD_ID: "1570471769217962036",          // identifiant du serveur Discord du Hub (pour les liens vers les tickets de contrat)
 };
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
@@ -424,15 +436,30 @@ const state = { user:null, me:null, filter:"Tous", planTab:"fondateurs", search:
 async function initAuth(){
   if (DEMO){ $("#demoBar").hidden=false; try{ if(sessionStorage.getItem("demoUser")) state.user={id:"demo",name:"Yosh"}; }catch(e){} return; }
   const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
-  sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-  const { data:{ session } } = await sb.auth.getSession();
+  // Flux "PKCE" : Discord renvoie un ?code= dans l'adresse (et pas un #access_token qui se mélangeait avec #espace).
+  // La session est ensuite gardée dans le navigateur : on reste connecté, même après avoir fermé la page.
+  sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+    auth:{ flowType:"pkce", persistSession:true, autoRefreshToken:true, detectSessionInUrl:true },
+  });
+  const q = new URLSearchParams(location.search);
+  if (q.get("error_description")) toast("Connexion impossible : " + q.get("error_description"));
+  const { data:{ session } } = await sb.auth.getSession();   // échange le ?code= contre une session
   setSession(session);
-  sb.auth.onAuthStateChange((ev, s) => { setSession(s); if(ev==="SIGNED_IN"||ev==="SIGNED_OUT") render(); });
+  if (q.has("code") || q.has("error")) {
+    // nettoie l'adresse et revient sur la page d'où on s'est connecté
+    let back = "#espace"; try{ back = localStorage.getItem("hub_after_login") || back; localStorage.removeItem("hub_after_login"); }catch(e){}
+    history.replaceState(null, "", location.pathname + back);
+    if (session) setTimeout(()=>toast("Connecté en tant que " + state.user.name), 300);
+  }
+  sb.auth.onAuthStateChange((ev, s) => {
+    const was = !!state.user; setSession(s);
+    if ((ev==="SIGNED_IN" && !was) || ev==="SIGNED_OUT") { state.me=null; render(); }
+  });
 }
 function setSession(session){
   if(!session){ state.user=null; state.me=null; return; }
   const m = session.user.user_metadata || {};
-  const token = session.provider_token || state.user?.token; // le jeton Discord n'est donné qu'à la connexion
+  const token = session.provider_token || (state.user?.id===session.user.id ? state.user.token : undefined); // jeton Discord : donné à la connexion
   state.user = { id:session.user.id, name:m.custom_claims?.global_name || m.full_name || m.name || "Membre", avatar:m.avatar_url, token };
 }
 async function login(){
@@ -440,12 +467,15 @@ async function login(){
     state.user={id:"demo",name:"Yosh"}; try{sessionStorage.setItem("demoUser","1")}catch(e){}
     toast("Connecté en admin (simulation de la connexion Discord)"); render(); return;
   }
-  await sb.auth.signInWithOAuth({ provider:"discord", options:{ scopes:"identify guilds", redirectTo: location.origin + location.pathname + "#espace" } });
+  try{ localStorage.setItem("hub_after_login", location.hash && location.hash!=="#" ? location.hash : "#espace"); }catch(e){}
+  // adresse de retour SANS # : elle doit figurer dans Supabase > Authentication > URL Configuration > Redirect URLs
+  const { error } = await sb.auth.signInWithOAuth({ provider:"discord", options:{ scopes:"identify guilds", redirectTo: location.origin + location.pathname } });
+  if (error) toast("Connexion impossible : " + error.message);
 }
 async function logout(){
   if (!DEMO) await sb.auth.signOut();
-  state.user=null; state.me=null; try{sessionStorage.removeItem("demoUser")}catch(e){}
-  location.hash="#"; render();
+  state.user=null; state.me=null; state.refreshed=false; try{sessionStorage.removeItem("demoUser")}catch(e){}
+  location.hash="#"; render(); toast("Tu es déconnecté");
 }
 function needLogin(){ if(state.user) return false; openModal(`<h3>Connexion requise</h3><p class="muted">Connecte-toi avec ton compte Discord pour continuer. Aucun mot de passe : un clic suffit.</p><div class="foot"><button class="btn btn-ghost" data-close>Annuler</button><button class="btn btn-primary" data-login>${DC} Se connecter avec Discord</button></div>`); return true; }
 
@@ -648,8 +678,22 @@ async function liveCounts(url){
 function srvIcon(name,size=52){return `<div class="srv-ico" style="background:${color(name)};width:${size}px;height:${size}px">${initials(name)}</div>`}
 function navRight(){
   if(!state.user) return `<a class="btn btn-ghost btn-sm hide-sm" href="${esc(CONFIG.DISCORD_INVITE)}" target="_blank" rel="noopener"><span class="btn-label">Rejoindre le serveur</span></a><button class="btn btn-primary btn-sm" data-login>${DC}<span class="btn-label">Connexion</span></button>`;
-  const av = state.user.avatar ? `<img src="${esc(state.user.avatar)}" alt="" class="avatar">` : `<span class="avatar">${initials(state.user.name)}</span>`;
-  return `${state.me?.is_admin?`<a href="#admin" class="btn btn-ghost btn-sm">Admin</a>`:""}<a href="#espace" class="btn btn-ghost btn-sm">${av}<span class="btn-label">${esc(state.user.name)}</span></a>`;
+  const name = state.me?.name || state.user.name;
+  const av = state.user.avatar ? `<img src="${esc(state.user.avatar)}" alt="" class="avatar">` : `<span class="avatar">${initials(name)}</span>`;
+  const st = state.me?.status;
+  const hint = st==="valide" ? "" : `<span class="dot" title="Profil à compléter"></span>`;
+  return `<div class="umenu">
+    <button class="btn btn-ghost btn-sm" data-umenu aria-haspopup="true">${av}<span class="btn-label">${esc(name)}</span>${hint}<span class="caret">▾</span></button>
+    <div class="umenu-list" id="umenu">
+      <div class="umenu-head">${av}<div><b>${esc(name)}</b><small>${st?pill(st):""}</small></div></div>
+      <a href="#espace-profil">Mon profil${st==="valide"?"":` <span class="tag gold" style="margin-left:auto">à compléter</span>`}</a>
+      <a href="#espace-serveurs">Mes serveurs</a>
+      <a href="#espace-annonces">Annonces et candidatures</a>
+      <a href="#espace-contrats">Mes contrats</a>
+      <a href="#espace-quetes">Mes quêtes</a>
+      ${state.me?.is_admin?`<a href="#admin">Panneau admin</a>`:""}
+      <a href="#" data-logout class="danger">Se déconnecter</a>
+    </div></div>`;
 }
 
 function serverCard(s,B){
@@ -863,7 +907,7 @@ async function vTalents(){
   return `<section><div class="wrap">
     <div style="display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap">
       <div><div class="eyebrow">Talents</div><h2>Le staff disponible</h2><p class="muted">Chaque profil est vérifié par le staff. Les badges certifiés sont donnés par la Team Hub.</p></div>
-      <a class="btn btn-primary" href="#espace">Créer mon profil</a>
+      <a class="btn btn-primary" href="#espace-profil">${state.user?"Mon profil":"Créer mon profil"}</a>
     </div>
     <div class="toolbar">${["Tous",...ROLES].map(r=>`<button class="chip ${state.filter===r?"on":""}" data-filter="${esc(r)}">${esc(r)}</button>`).join("")}</div>
     <div class="grid g3">${list.length?list.map(t=>talentCard(t,B)).join(""):`<div class="empty">Aucun profil pour ce filtre.</div>`}</div>
@@ -1162,6 +1206,11 @@ window.addEventListener("hashchange",()=>{const r=route()[0];if(r!==lastRoute){s
 
 /* ============================== Actions ============================== */
 const ACT="[data-slot],[data-tag],[data-open-profile],[data-open-server],[data-propose-contract],[data-cact],[data-cdetail],[data-review],[data-cert],[data-quest],[data-login],[data-logout],[data-filter],[data-plantab],[data-plan],[data-apply],[data-contact],[data-new-listing],[data-del-listing],[data-claim],[data-edit-server],[data-decide],[data-refuse],[data-badge],[data-del-badge],[data-close]";
+document.addEventListener("click", e=>{
+  const m=$("#umenu"); if(!m) return;
+  if(e.target.closest("[data-umenu]")){ e.preventDefault(); m.classList.toggle("open"); }
+  else if(!e.target.closest("#umenu")||e.target.closest("a")) m.classList.remove("open");
+});
 document.addEventListener("click", async e=>{
   let t=e.target.closest(ACT); if(!t) return;
   if((t.dataset.openProfile||t.dataset.openServer)&&e.target.closest("a,button")&&e.target.closest("a,button")!==t&&!e.target.closest("a,button").matches(ACT)) return;
