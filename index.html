@@ -682,7 +682,7 @@ function navRight(){
   const av = state.user.avatar ? `<img src="${esc(state.user.avatar)}" alt="" class="avatar">` : `<span class="avatar">${initials(name)}</span>`;
   const st = state.me?.status;
   const hint = st==="valide" ? "" : `<span class="dot" title="Profil à compléter"></span>`;
-  return `<div class="umenu">
+  return `<a class="btn btn-ghost btn-sm hide-sm" href="${esc(CONFIG.DISCORD_INVITE)}" target="_blank" rel="noopener">${DC}<span class="btn-label">Rejoindre le serveur</span></a><div class="umenu">
     <button class="btn btn-ghost btn-sm" data-umenu aria-haspopup="true">${av}<span class="btn-label">${esc(name)}</span>${hint}<span class="caret">▾</span></button>
     <div class="umenu-list" id="umenu">
       <div class="umenu-head">${av}<div><b>${esc(name)}</b><small>${st?pill(st):""}</small></div></div>
@@ -691,6 +691,7 @@ function navRight(){
       <a href="#espace-annonces">Annonces et candidatures</a>
       <a href="#espace-contrats">Mes contrats</a>
       <a href="#espace-quetes">Mes quêtes</a>
+      <a href="${esc(CONFIG.DISCORD_INVITE)}" target="_blank" rel="noopener">Rejoindre le serveur Discord</a>
       ${state.me?.is_admin?`<a href="#admin">Panneau admin</a>`:""}
       <a href="#" data-logout class="danger">Se déconnecter</a>
     </div></div>`;
