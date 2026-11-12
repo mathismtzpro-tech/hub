@@ -1,5 +1,5 @@
 -- =====================================================================
--- Le Hub — schéma Supabase (v3 : badges, certifications, quêtes)
+-- Le Hub — schéma Supabase (v4 : profils détaillés, stats serveurs, contrats)
 -- Toutes les tables commencent par hub_ : elles peuvent vivre dans le
 -- MÊME projet Supabase que le dashboard Protect sans rien toucher.
 -- À coller dans Supabase > SQL Editor > New query, puis "Run".
@@ -42,6 +42,19 @@ alter table public.hub_profiles add column if not exists certs text[] not null d
 alter table public.hub_profiles add column if not exists quests text[] not null default '{}';  -- quêtes Staff certifié validées
 alter table public.hub_profiles add column if not exists team boolean not null default false;  -- Team Hub (synchronisé par le bot depuis le rôle staff)
 
+-- Profils détaillés (staff / talents)
+alter table public.hub_profiles add column if not exists about text;                                  -- description détaillée / ce que je propose
+alter table public.hub_profiles add column if not exists skill_levels jsonb not null default '{}';    -- {"Modération":"Confirmé", ...}
+alter table public.hub_profiles add column if not exists languages jsonb not null default '{}';       -- {"Anglais":"Intermédiaire", ...}
+alter table public.hub_profiles add column if not exists schedule text[] not null default '{}';       -- ["lun:soir","sam:aprem", ...]
+alter table public.hub_profiles add column if not exists paid_modes text[] not null default '{}';     -- {Bénévole, Rémunéré}
+alter table public.hub_profiles add column if not exists rate text;                                   -- tarif indicatif
+alter table public.hub_profiles add column if not exists level text;                                  -- niveau global
+-- détection de liens : présentation courte ET description détaillée
+alter table public.hub_profiles drop column if exists has_link;
+alter table public.hub_profiles add column has_link boolean generated always as
+  ((coalesce(bio,'') || ' ' || coalesce(about,'')) ~* '(https?://|www\.|discord\.gg|discord\.com/invite)') stored;
+
 -- Fiches serveurs : créées uniquement par la fonction claim-server
 -- (qui vérifie auprès de Discord que la personne gère bien le serveur)
 create table if not exists public.hub_servers (
@@ -71,6 +84,27 @@ create table if not exists public.hub_servers (
   updated_at timestamptz not null default now()
 );
 
+-- Tags et statistiques des serveurs (les stats sont remplies par Protect)
+alter table public.hub_servers add column if not exists tags text[] not null default '{}' check (cardinality(tags) <= 3);
+alter table public.hub_servers add column if not exists bots int;
+alter table public.hub_servers add column if not exists channels int;
+alter table public.hub_servers add column if not exists roles int;
+alter table public.hub_servers add column if not exists boosts int;
+alter table public.hub_servers add column if not exists boost_tier int;
+alter table public.hub_servers add column if not exists guild_created_at timestamptz;
+alter table public.hub_servers add column if not exists messages_24h int;
+alter table public.hub_servers add column if not exists stats_updated_at timestamptz;
+
+-- Historique jour par jour (courbe sur 30 jours)
+create table if not exists public.hub_server_stats (
+  server_id bigint not null references public.hub_servers(id) on delete cascade,
+  day date not null default current_date,
+  members int,
+  online int,
+  messages int not null default 0,
+  primary key (server_id, day)
+);
+
 -- Annonces de recrutement (publiées dans le forum Discord par le bot)
 create table if not exists public.hub_listings (
   id bigint generated always as identity primary key,
@@ -95,6 +129,39 @@ create table if not exists public.hub_applications (
   status text not null default 'en attente',
   notified boolean not null default false,
   created_at timestamptz not null default now()
+);
+
+-- Contrats entre un fondateur et un membre du staff
+create table if not exists public.hub_contracts (
+  id bigint generated always as identity primary key,
+  server_id bigint not null references public.hub_servers(id) on delete cascade,
+  founder_id uuid not null references public.hub_profiles(id) on delete cascade,
+  talent_id uuid not null references public.hub_profiles(id) on delete cascade,
+  listing_id bigint references public.hub_listings(id) on delete set null,
+  application_id bigint references public.hub_applications(id) on delete set null,
+  server_name text, founder_name text, talent_name text,     -- copiés à la création
+  role text not null,
+  duration text not null,
+  start_date date not null default current_date,
+  end_date date,                                              -- vide = sans durée fixe
+  trial text,
+  hours text,
+  schedule_text text,
+  pay_mode text not null default 'benevole' check (pay_mode in ('benevole','remunere')),
+  pay_amount text,
+  missions text not null,
+  conditions text,
+  status text not null default 'propose'
+    check (status in ('propose','accepte','refuse','annule','termine','rompu')),
+  accepted_at timestamptz,
+  ended_at timestamptz,
+  ended_by uuid,
+  end_reason text,
+  channel_id text,                                            -- ticket Discord
+  control_message_id text,
+  sync_needed boolean not null default false,                 -- le bot doit mettre le ticket à jour
+  created_at timestamptz not null default now(),
+  check (talent_id <> founder_id)
 );
 
 -- Avis dans les deux sens
@@ -209,9 +276,11 @@ begin
   new.status := old.status; new.refusal_reason := old.refusal_reason;
   new.notified_staff := old.notified_staff; new.staff_message_id := old.staff_message_id; new.notified_user := old.notified_user;
   new.certs := old.certs; new.quests := old.quests; new.team := old.team;
-  if (new.name, new.kind, new.skills, new.bio, new.dispo, new.paid, new.portfolio)
+  if (new.name, new.kind, new.skills, new.bio, new.dispo, new.paid, new.portfolio,
+      new.about, new.skill_levels, new.languages, new.schedule, new.paid_modes, new.rate, new.level)
      is distinct from
-     (old.name, old.kind, old.skills, old.bio, old.dispo, old.paid, old.portfolio) then
+     (old.name, old.kind, old.skills, old.bio, old.dispo, old.paid, old.portfolio,
+      old.about, old.skill_levels, old.languages, old.schedule, old.paid_modes, old.rate, old.level) then
     new.status := 'en_attente'; new.notified_staff := false; new.refusal_reason := null;
   end if;
   new.updated_at := now();
@@ -236,8 +305,11 @@ begin
   new.protect := old.protect; new.pro := old.pro; new.month := old.month;
   new.status := old.status; new.refusal_reason := old.refusal_reason;
   new.notified_staff := old.notified_staff; new.staff_message_id := old.staff_message_id; new.notified_user := old.notified_user;
-  if (new.description, new.cat, new.invite_url)
-     is distinct from (old.description, old.cat, old.invite_url) then
+  new.bots := old.bots; new.channels := old.channels; new.roles := old.roles; new.boosts := old.boosts;
+  new.boost_tier := old.boost_tier; new.guild_created_at := old.guild_created_at;
+  new.messages_24h := old.messages_24h; new.stats_updated_at := old.stats_updated_at;
+  if (new.description, new.cat, new.invite_url, new.tags)
+     is distinct from (old.description, old.cat, old.invite_url, old.tags) then
     new.status := 'en_attente'; new.notified_staff := false; new.refusal_reason := null;
   end if;
   new.updated_at := now();
@@ -264,12 +336,67 @@ drop trigger if exists hub_guard_listings on public.hub_listings;
 create trigger hub_guard_listings before insert or update on public.hub_listings
   for each row execute function public.hub_guard_listings();
 
+-- Team Hub (staff du serveur) : voit tous les contrats
+create or replace function public.hub_is_team() returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.hub_is_admin() or coalesce((select team from public.hub_profiles where id = auth.uid()), false);
+$$;
+
+-- Contrats : un membre ne peut créer qu'une proposition ; les noms sont copiés ;
+-- tout changement de statut prévient le bot (sync_needed) pour mettre le ticket à jour
+create or replace function public.hub_contracts_before() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    if not public.hub_is_trusted() then
+      new.status := 'propose'; new.accepted_at := null; new.ended_at := null; new.ended_by := null;
+      new.end_reason := null; new.channel_id := null; new.control_message_id := null; new.sync_needed := false;
+    end if;
+    select name into new.server_name from public.hub_servers where id = new.server_id;
+    select name into new.founder_name from public.hub_profiles where id = new.founder_id;
+    select name into new.talent_name from public.hub_profiles where id = new.talent_id;
+  elsif new.status is distinct from old.status then
+    new.sync_needed := true;
+  end if;
+  return new;
+end $$;
+drop trigger if exists hub_contracts_before on public.hub_contracts;
+create trigger hub_contracts_before before insert or update on public.hub_contracts
+  for each row execute function public.hub_contracts_before();
+
+-- Les seules actions possibles sur un contrat depuis le site
+create or replace function public.hub_contract_action(p_id bigint, p_action text, p_reason text default null)
+returns text language plpgsql security definer set search_path = public as $$
+declare c public.hub_contracts; uid uuid := auth.uid();
+begin
+  select * into c from public.hub_contracts where id = p_id for update;
+  if not found then raise exception 'Contrat introuvable'; end if;
+  if p_action = 'accepter' and uid = c.talent_id and c.status = 'propose' then
+    update public.hub_contracts set status = 'accepte', accepted_at = now() where id = p_id;
+  elsif p_action = 'refuser' and uid = c.talent_id and c.status = 'propose' then
+    update public.hub_contracts set status = 'refuse', ended_at = now(), ended_by = uid, end_reason = p_reason where id = p_id;
+  elsif p_action = 'annuler' and uid = c.founder_id and c.status = 'propose' then
+    update public.hub_contracts set status = 'annule', ended_at = now(), ended_by = uid, end_reason = p_reason where id = p_id;
+  elsif p_action = 'terminer' and uid in (c.founder_id, c.talent_id) and c.status = 'accepte' then
+    update public.hub_contracts set status = 'termine', ended_at = now(), ended_by = uid, end_reason = p_reason where id = p_id;
+  elsif p_action = 'rompre' and public.hub_is_team() and c.status in ('propose','accepte') then
+    update public.hub_contracts set status = 'rompu', ended_at = now(), ended_by = uid, end_reason = p_reason where id = p_id;
+  else
+    raise exception 'Action impossible sur ce contrat';
+  end if;
+  return 'ok';
+end $$;
+revoke all on function public.hub_contract_action(bigint, text, text) from public;
+grant execute on function public.hub_contract_action(bigint, text, text) to authenticated;
+
 -- ---------------------------------------------------------------------
 -- 4. Vue publique des talents (seulement les profils validés)
 -- ---------------------------------------------------------------------
-create or replace view public.hub_talents as
+drop view if exists public.hub_talents;
+create view public.hub_talents as
 select p.id, p.name, p.avatar_url, p.skills, p.bio as exp, p.paid, p.dispo,
        p.verified, p.portfolio, p.created_at,
+       p.about, p.skill_levels, p.languages, p.schedule, p.paid_modes, p.rate, p.level,
        coalesce(round(avg(r.rating)::numeric, 1), 0) as rating,
        count(r.id) as reviews
 from public.hub_profiles p
@@ -301,6 +428,8 @@ alter table public.hub_reviews      enable row level security;
 alter table public.hub_orders       enable row level security;
 alter table public.hub_badges       enable row level security;
 alter table public.hub_badge_links  enable row level security;
+alter table public.hub_server_stats enable row level security;
+alter table public.hub_contracts    enable row level security;
 
 do $$ declare p record; begin
   for p in select policyname, tablename from pg_policies
@@ -338,10 +467,27 @@ create policy "supprimer son annonce" on public.hub_listings for delete
 
 -- Candidatures
 create policy "postuler" on public.hub_applications for insert
-  with check (user_id = auth.uid());
+  with check (user_id = auth.uid() and exists (
+    select 1 from public.hub_profiles p where p.id = auth.uid() and p.status = 'valide'));
 create policy "voir les candidatures" on public.hub_applications for select
   using (user_id = auth.uid() or public.hub_is_admin() or exists (
     select 1 from public.hub_listings l where l.id = listing_id and l.owner_id = auth.uid()));
+
+-- Statistiques des serveurs (écrites par le bot uniquement)
+create policy "stats visibles" on public.hub_server_stats for select using (true);
+
+-- Contrats : visibles par les deux personnes et par la Team Hub ;
+-- les changements de statut passent par hub_contract_action()
+create policy "voir ses contrats" on public.hub_contracts for select
+  using (founder_id = auth.uid() or talent_id = auth.uid() or public.hub_is_team());
+create policy "proposer un contrat" on public.hub_contracts for insert
+  with check (
+    founder_id = auth.uid()
+    and exists (select 1 from public.hub_servers s
+                where s.id = server_id and s.owner_id = auth.uid() and s.status = 'valide')
+    and exists (select 1 from public.hub_profiles p where p.id = talent_id and p.status = 'valide')
+    and (select count(*) from public.hub_contracts x
+         where x.founder_id = auth.uid() and x.status = 'propose') < 5);
 
 -- Avis
 create policy "avis visibles" on public.hub_reviews for select using (true);
@@ -368,3 +514,9 @@ create policy "attribuer les badges" on public.hub_badge_links for all
 --    Mode développeur, puis clic droit sur ton pseudo > Copier l'identifiant)
 -- ---------------------------------------------------------------------
 -- update public.hub_profiles set is_admin = true, status = 'valide' where discord_id = 'TON_ID_DISCORD';
+
+-- ---------------------------------------------------------------------
+-- 7. Prévient l'API de Supabase que les tables ont changé (évite l'erreur
+--    "Could not find the ... column ... in the schema cache")
+-- ---------------------------------------------------------------------
+notify pgrst, 'reload schema';
