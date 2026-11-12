@@ -167,6 +167,29 @@ footer a{display:block;margin:5px 0}
 footer a:hover{color:var(--text)}
 .disclaimer{margin-top:28px;font-size:12.5px;color:#666c88}
 
+.admin-box{margin-top:18px;border:1px dashed #5962fe66;border-radius:14px;padding:4px 14px 12px;background:#5962fe0a}
+.admin-box summary{cursor:pointer;font-size:12.5px;font-weight:600;color:#aab0ff;text-transform:uppercase;letter-spacing:.06em;padding:8px 0}
+.act-pill{position:fixed;left:16px;bottom:16px;z-index:25;display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:#11131ecc;border:1px solid var(--line);color:var(--muted);font-size:12px;opacity:.6;transition:.2s;backdrop-filter:blur(6px)}
+.act-pill:hover{opacity:1;color:var(--text)}
+.act-pill.hidden{display:none}
+.act-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 #3ecf8e88;animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #3ecf8e66}70%{box-shadow:0 0 0 7px #3ecf8e00}100%{box-shadow:0 0 0 0 #3ecf8e00}}
+.act-panel{display:none;position:fixed;left:16px;bottom:16px;z-index:26;width:320px;max-height:420px;background:var(--bg-2);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px #0009;overflow:hidden;flex-direction:column}
+.act-panel.open{display:flex}
+.act-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px}
+.act-head b{flex:1}
+.act-tog{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.act-x{color:var(--muted);font-size:12px;padding:2px 6px}
+.act-list{overflow:auto;padding:6px}
+.act-item{display:flex;gap:9px;padding:7px 8px;border-radius:9px;font-size:12.5px}
+.act-item:hover{background:var(--card)}
+.act-item .ico{width:22px;height:22px;flex:none;border-radius:7px;background:var(--brand-soft);color:#b9beff;display:grid;place-items:center;font-size:11px}
+.act-item.staff .ico{background:#ffffff0d;color:var(--muted)}
+.act-item p{line-height:1.35}
+.act-item small{color:var(--muted);font-size:11px}
+.act-more{display:block;text-align:center;font-size:12px;color:var(--muted);padding:8px;border-top:1px solid var(--line)}
+.act-more:hover{color:var(--text)}
+@media (max-width:560px){.act-panel{left:8px;right:8px;width:auto;bottom:8px}}
 .umenu{position:relative}
 .umenu .caret{font-size:11px;color:var(--muted);margin-left:2px}
 .umenu .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);display:inline-block}
@@ -279,6 +302,8 @@ button.slot{cursor:pointer}button.slot:hover{border-color:var(--brand)}
 
 <div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
+<button class="act-pill" data-act aria-label="Activité récente"><span class="act-dot"></span>Activité</button>
+<div class="act-panel" id="actPanel" aria-live="polite"></div>
 
 <script type="module">
 /* =========================================================================
@@ -411,6 +436,18 @@ const D = {
                   {id:2,listing_id:1,user_id:"p4",message:"Je connais bien le RP FiveM, je peux aider sur la whitelist.",created_at:"2026-11-12"}];
   D.contracts=[{id:1,server_id:1,founder_id:"demo",talent_id:"p4",server_name:"Six Life RP",founder_name:"Yosh",talent_name:"Tempo",role:"Modération",duration:"1 mois",start_date:"2026-11-05",end_date:"2026-12-05",trial:"1 semaine",hours:"6 h / semaine",schedule_text:"3 soirs par semaine, 20 h - 23 h",pay_mode:"benevole",pay_amount:"",missions:"Gérer les tickets de whitelist et modérer le serveur le soir.",conditions:"Préavis de 3 jours pour arrêter.",status:"accepte",accepted_at:"2026-11-05",channel_id:"123",created_at:"2026-11-04"}];
 })();
+D.logs=[
+  {id:9,created_at:new Date(Date.now()-4*60e3).toISOString(),kind:"annonce",message:"Six Life RP recrute : Modération",public:true,actor_name:"Yosh"},
+  {id:8,created_at:new Date(Date.now()-35*60e3).toISOString(),kind:"profil",message:"Profil à vérifier : Zed",public:false},
+  {id:7,created_at:new Date(Date.now()-2*3600e3).toISOString(),kind:"badge",message:"Nova est maintenant Staff certifié",public:true,actor_name:"Yosh"},
+  {id:6,created_at:new Date(Date.now()-3*3600e3).toISOString(),kind:"contrat",message:"Nouveau contrat signé sur Six Life RP (Modération)",public:true},
+  {id:5,created_at:new Date(Date.now()-5*3600e3).toISOString(),kind:"serveur",message:"Fiche Neon City RP : refuse (lien dans la description)",public:false,actor_name:"Yosh"},
+  {id:4,created_at:new Date(Date.now()-26*3600e3).toISOString(),kind:"serveur",message:"Nouveau serveur vérifié : Valorant FR League",public:true,actor_name:"Yosh"},
+  {id:3,created_at:new Date(Date.now()-30*3600e3).toISOString(),kind:"badge",message:"Kaizen reçoit le badge « Partenaire »",public:true,actor_name:"Yosh"},
+  {id:2,created_at:new Date(Date.now()-50*3600e3).toISOString(),kind:"commande",message:"Commande Studio livrée (Starter)",public:true},
+  {id:1,created_at:new Date(Date.now()-52*3600e3).toISOString(),kind:"membre",message:"Nouveau membre inscrit : Ayla",public:false},
+];
+function demoLog(kind,message,pub){ D.logs.unshift({id:D.next++,created_at:new Date().toISOString(),kind,message,public:pub,actor_name:"Yosh"}); }
 function demoStats(s){ const n=30, out=[]; let m=Math.round((s.members||100)*0.82); for(let i=n-1;i>=0;i--){ m=Math.round(m*(1+(Math.sin(i*1.7+s.id)*0.004+0.006))); const d=new Date(Date.now()-i*864e5); out.push({day:d.toISOString().slice(0,10),members:Math.min(m,s.members||m),messages:Math.round((s.messages_24h||200)*(0.7+0.3*Math.abs(Math.sin(i+s.id))))}); } return out; }
 
 /* ============================== Utilitaires ============================== */
@@ -425,7 +462,7 @@ const pill = s => { const [t,c]=STATUS[s]||[s,""]; return `<span class="tag ${c}
 const DC = `<svg class="dc-ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.6 1.3a18.3 18.3 0 0 0-5.6 0L8.6 3a19.7 19.7 0 0 0-4.9 1.4C.6 9 -.3 13.6.1 18.1a19.9 19.9 0 0 0 6 3l1.3-2a13 13 0 0 1-2-1l.5-.4a14.2 14.2 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.8 19.8 0 0 0 6-3c.5-5.2-.8-9.7-3.6-13.7ZM8 15.4c-1.2 0-2.2-1.1-2.2-2.4S6.8 10.6 8 10.6s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>`;
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2800)}
 function openModal(html,wide){$("#modal").innerHTML=html;$("#modal").classList.toggle("wide",!!wide);$("#modalBg").classList.add("open")}
-function closeModal(){$("#modalBg").classList.remove("open")}
+function closeModal(){$("#modalBg").classList.remove("open"); state.modalRef=null;}
 $("#modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")closeModal()});
 $("#burger").addEventListener("click",()=>$("#navLinks").classList.toggle("open"));
 
@@ -522,7 +559,11 @@ const api = {
   },
   async saveProfile(d){
     if(DEMO){ const changed=["name","kind","bio","dispo","paid","portfolio"].some(k=>d[k]!==D.profiles[0][k])||String(d.skills)!==String(D.profiles[0].skills); Object.assign(D.profiles[0],d); if(changed&&!D.profiles[0].is_admin) D.profiles[0].status="en_attente"; return done(null,"Profil enregistré"); }
-    const {error}=await sb.from("hub_profiles").update(d).eq("id",state.user.id); return done(error,"Profil envoyé en vérification");
+    const {error}=await sb.from("hub_profiles").update(d).eq("id",state.user.id);
+    if(error) return done(error);
+    const {data:me}=await sb.from("hub_profiles").select("status,is_admin").eq("id",state.user.id).maybeSingle();
+    return done(null, me?.status==="en_attente" ? "Profil envoyé en vérification : le staff le voit dans le salon de vérification"
+      : me?.is_admin ? "Profil enregistré (tu es admin : il est validé directement, sans passer par la vérification)" : "Profil enregistré");
   },
   async myServers(){
     if(DEMO) return D.servers.filter(s=>s.owner_id==="demo");
@@ -565,7 +606,7 @@ const api = {
     const {data}=await q.order("created_at",{ascending:true}); return data||[];
   },
   async decide(table,id,status,reason){
-    if(DEMO){ const x=D[T[table]].find(r=>r.id==id); x.status=status; x.refusal_reason=reason||null; return done(null,status==="valide"?"Validé":"Refusé : la personne est prévenue sur Discord"); }
+    if(DEMO){ const x=D[T[table]].find(r=>r.id==id); x.status=status; x.refusal_reason=reason||null; demoLog(table==="hub_servers"?"serveur":"profil",(status==="valide"?(table==="hub_servers"?"Nouveau serveur vérifié : ":"Nouveau profil vérifié : "):`${status} : `)+x.name,status==="valide"); return done(null,status==="valide"?"Validé":status==="suspendu"?"Suspendu":"Refusé : la personne est prévenue sur Discord"); }
     const {error}=await sb.from(table).update({status,refusal_reason:reason||null,notified_staff:true}).eq("id",id);
     return done(error,status==="valide"?"Validé":"Refusé : la personne est prévenue sur Discord");
   },
@@ -583,7 +624,9 @@ const api = {
   },
   async toggleBadge(badge_id,target_type,target_id,on){
     const row={badge_id:Number(badge_id),target_type,target_id:String(target_id)};
-    if(DEMO){ D.links=D.links.filter(l=>!(l.badge_id==badge_id&&l.target_type===target_type&&l.target_id==target_id)); if(on) D.links.push(row); return done(null,on?"Badge attribué":"Badge retiré"); }
+    if(DEMO){ D.links=D.links.filter(l=>!(l.badge_id==badge_id&&l.target_type===target_type&&l.target_id==target_id)); if(on) D.links.push(row);
+      const b=D.badges.find(x=>x.id==badge_id), t=(target_type==="server"?D.servers:D.profiles).find(x=>String(x.id)===String(target_id)); demoLog("badge",on?`${t?.name} reçoit le badge « ${b?.label} »`:`Badge « ${b?.label} » retiré à ${t?.name}`,on);
+      return done(null,on?"Badge attribué":"Badge retiré"); }
     const {error}= on ? await sb.from("hub_badge_links").insert(row)
       : await sb.from("hub_badge_links").delete().match(row);
     return done(error,on?"Badge attribué":"Badge retiré");
@@ -627,6 +670,16 @@ const api = {
   async review(target_id,rating,comment){
     if(DEMO) return done(null,"Merci pour ton avis !");
     const {error}=await sb.from("hub_reviews").insert({author_id:state.user.id,target_id,rating:Number(rating),comment}); return done(error?.code==="23505"?{message:"Tu as déjà laissé un avis à ce membre."}:error,"Merci pour ton avis !");
+  },
+  async logs(all,limit=30){
+    if(DEMO) return D.logs.filter(l=>all||l.public).slice(0,limit);
+    let q=sb.from("hub_logs").select("*").order("created_at",{ascending:false}).limit(limit);
+    if(!all) q=q.eq("public",true);
+    const {data}=await q; return data||[];
+  },
+  async profileRow(id){
+    if(DEMO) return D.profiles.find(x=>String(x.id)===String(id))||null;
+    const {data}=await sb.from("hub_profiles").select("*").eq("id",id).maybeSingle(); return data;
   },
   async orders(){
     if(DEMO) return D.orders;
@@ -742,6 +795,61 @@ function talentCard(t,B){
   </div>`;
 }
 
+function badgeChips(B,type,id){
+  return B.badges.map(b=>{const on=B.links.some(l=>l.badge_id==b.id&&l.target_type===type&&String(l.target_id)===String(id));
+    return `<button class="chip ${on?"on":""}" style="${on?`background:${safeColor(b.color)};border-color:${safeColor(b.color)}`:""}" data-badge="${esc(b.id)}:${type}:${esc(id)}:${on?0:1}">${esc(b.emoji)} ${esc(b.label)}</button>`;}).join("")||`<span class="muted" style="font-size:13px">Crée d'abord un badge (Panneau admin > Badges).</span>`;
+}
+function adminProfileTools(p,B){
+  const P=B.people.get(String(p.id))||{}; const qd=new Set(P.quests||[]);
+  return `<div class="admin-row"><span class="muted">Statut</span>${pill(p.status)}
+      ${p.status!=="valide"?`<button class="chip" data-decide="hub_profiles:${esc(p.id)}:valide">Valider</button>`:""}
+      ${p.status!=="suspendu"?`<button class="chip" data-decide="hub_profiles:${esc(p.id)}:suspendu">Suspendre</button>`:""}
+      ${p.status==="en_attente"?`<button class="chip" data-refuse="hub_profiles:${esc(p.id)}">Refuser</button>`:""}</div>
+    <div class="admin-row"><span class="muted">Formule</span><select data-plan-select="${esc(p.id)}" style="width:auto;padding:5px 8px;font-size:13px">${PLAN_NAMES.map(n=>`<option ${p.plan===n?"selected":""}>${n}</option>`).join("")}</select>
+      <label class="switch"><input type="checkbox" data-field="hub_profiles:${esc(p.id)}:verified" ${p.verified?"checked":""}> Expériences vérifiées</label></div>
+    <div class="admin-row"><span class="muted">Certifications</span>${CERTS.map(([k,l])=>`<button class="chip ${(P.certs||[]).includes(k)?"on":""}" data-cert="${esc(p.id)}:${k}">${esc(l)}</button>`).join("")}</div>
+    <div class="admin-row"><span class="muted">Quêtes staff (${QUESTS.filter(([k])=>k==="profil"?p.status==="valide":qd.has(k)).length}/${QUESTS.length})</span>${QUESTS.filter(([k])=>k!=="profil").map(([k,l])=>`<button class="chip ${qd.has(k)?"on":""}" title="${esc(l)}" data-quest="${esc(p.id)}:${k}">${esc(k)}</button>`).join("")}</div>
+    <div class="admin-row"><span class="muted">Badges perso</span>${badgeChips(B,"profile",p.id)}</div>
+    <p class="muted" style="font-size:12px;margin-top:8px">Automatiques : Fondateur certifié, Client Studio, Team Hub (rôle staff sur le Discord).</p>`;
+}
+function adminServerTools(sv,B){
+  return `<div class="admin-row"><span class="muted">Statut</span>${pill(sv.status)}
+      ${sv.status!=="valide"?`<button class="chip" data-decide="hub_servers:${esc(sv.id)}:valide">Valider</button>`:""}
+      ${sv.status!=="suspendu"?`<button class="chip" data-decide="hub_servers:${esc(sv.id)}:suspendu">Suspendre</button>`:""}
+      ${sv.status==="en_attente"?`<button class="chip" data-refuse="hub_servers:${esc(sv.id)}">Refuser</button>`:""}</div>
+    <div class="admin-row"><span class="muted">Mise en avant</span><label class="switch"><input type="checkbox" data-field="hub_servers:${esc(sv.id)}:month" ${sv.month?"checked":""}> Serveur du mois</label></div>
+    <div class="admin-row"><span class="muted">Badges perso</span>${badgeChips(B,"server",sv.id)}</div>`;
+}
+const adminBox = inner => state.me?.is_admin ? `<details class="admin-box" open><summary>Outils admin</summary>${inner}</details>` : "";
+const withAdmin = (html,box) => { if(!box) return html; const i=html.lastIndexOf('<div class="foot">'); return i<0?html+box:html.slice(0,i)+box+html.slice(i); };
+async function openProfile(id){
+  const B=await api.badges(); let t=await api.talent(id), row=null;
+  if(state.me?.is_admin){ row=await api.profileRow(id); if(!t&&row) t={...row,exp:row.bio}; }
+  if(!t){ toast("Profil introuvable ou pas encore validé"); return false; }
+  const top=$("#modal").scrollTop; openModal(withAdmin(profileModal(t,B),row?adminBox(adminProfileTools(row,B)):""),true); $("#modal").scrollTop=top;
+  state.modalRef={type:"profile",id}; return true;
+}
+async function openServer(id){
+  const B=await api.badges(); let list=await api.servers(); let sv=list.find(x=>String(x.id)===String(id));
+  if(!sv&&state.me?.is_admin){ sv=(await api.list("hub_servers")).find(x=>String(x.id)===String(id)); }
+  if(!sv){ closeModal(); return false; }
+  const top=$("#modal").scrollTop; openModal(withAdmin(await serverModal(sv,B),adminBox(adminServerTools(sv,B))),true); $("#modal").scrollTop=top;
+  state.modalRef={type:"server",id}; return true;
+}
+async function refreshModal(){
+  const r=state.modalRef; if(!r||!$("#modalBg").classList.contains("open")) return;
+  if(r.type==="profile") await openProfile(r.id); else if(r.type==="server") await openServer(r.id);
+}
+const KIND_ICO={serveur:"◧",profil:"◉",badge:"★",annonce:"⚑",contrat:"✎",commande:"◆",membre:"+"};
+function ago(d){ const m=Math.round((Date.now()-new Date(d))/60000); if(m<1) return "à l'instant"; if(m<60) return `il y a ${m} min`; const h=Math.round(m/60); if(h<24) return `il y a ${h} h`; const j=Math.round(h/24); return j===1?"hier":`il y a ${j} j`; }
+async function renderActivity(){
+  const pnl=$("#actPanel"); if(!pnl.classList.contains("open")) return;
+  const team=!!(state.me?.is_admin||state.me?.team); const all=team&&state.actAll;
+  const list=await api.logs(all,15);
+  pnl.innerHTML=`<div class="act-head"><b>Activité récente</b>${team?`<button class="act-tog" data-actall>${all?"Tout (staff)":"Public"}</button>`:""}<button class="act-x" data-act aria-label="Fermer">✕</button></div>
+    <div class="act-list">${list.length?list.map(l=>`<div class="act-item ${l.public?"":"staff"}"><span class="ico">${KIND_ICO[l.kind]||"•"}</span><div><p>${esc(l.message)}</p><small>${esc(ago(l.created_at))}${all&&l.actor_name?` · par ${esc(l.actor_name)}`:""}${all&&!l.public?" · staff":""}</small></div></div>`).join(""):`<p class="muted" style="font-size:13px;padding:8px">Rien pour le moment.</p>`}</div>
+    ${team?`<a class="act-more" href="#admin-journal">Journal complet →</a>`:""}`;
+}
 function profileModal(t,B){
   const P=B.people?.get(String(t.id)); const sk=Object.entries(t.skill_levels||{}), lg=Object.entries(t.languages||{});
   const mine=state.user&&String(t.id)===String(state.me?.id||(DEMO?"demo":""));
@@ -1097,26 +1205,21 @@ async function vAdmin(sub){
       <div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-primary btn-sm" data-decide="hub_profiles:${esc(p.id)}">Valider</button><button class="btn btn-ghost btn-sm" data-refuse="hub_profiles:${esc(p.id)}">Refuser</button></div>
     </div>`).join(""):`<div class="empty">Rien à vérifier pour le moment.</div>`}</div>`;
   } else if(sub==="gestion"){
-    const [servers,profiles,B]=await Promise.all([api.list("hub_servers","valide"),api.list("hub_profiles","valide"),api.badges()]);
-    const q=state.adminSearch.toLowerCase();
-    const fs=servers.filter(s=>!q||s.name.toLowerCase().includes(q)), fp=profiles.filter(p=>!q||p.name.toLowerCase().includes(q));
+    const [servers,profiles,B]=await Promise.all([api.list("hub_servers"),api.list("hub_profiles"),api.badges()]);
+    const q=state.adminSearch.toLowerCase(), st=state.adminStatus||"tous";
+    const keep=x=>(!q||x.name.toLowerCase().includes(q))&&(st==="tous"||x.status===st);
+    const fs=servers.filter(keep), fp=profiles.filter(keep);
     const chips=(type,id)=>B.badges.map(b=>{const on=B.links.some(l=>l.badge_id==b.id&&l.target_type===type&&String(l.target_id)===String(id));return `<button class="chip ${on?"on":""}" style="${on?`background:${safeColor(b.color)};border-color:${safeColor(b.color)}`:""}" data-badge="${esc(b.id)}:${type}:${esc(id)}:${on?0:1}">${esc(b.emoji)} ${esc(b.label)}</button>`}).join("");
-    body=`<h2>Gestion et badges</h2><p class="muted" style="margin:6px 0 14px">Serveur du mois, formules, certifications, quêtes et badges personnalisés. Les badges Fondateur certifié, Client Studio et Team Hub (rôle staff sur le Discord) sont automatiques.</p>
-    <input type="search" placeholder="Rechercher un serveur ou un membre…" value="${esc(state.adminSearch)}" data-admin-search style="max-width:360px;margin-bottom:18px">
+    body=`<h2>Membres et serveurs</h2><p class="muted" style="margin:6px 0 14px">Serveur du mois, formules, certifications, quêtes et badges personnalisés. Les badges Fondateur certifié, Client Studio et Team Hub (rôle staff sur le Discord) sont automatiques.</p>
+    <div class="toolbar" style="margin:0 0 18px"><input type="search" placeholder="Rechercher un serveur ou un membre…" value="${esc(state.adminSearch)}" data-admin-search style="max-width:320px">
+      ${[["tous","Tous"],["valide","Validés"],["en_attente","En attente"],["incomplet","À compléter"],["refuse","Refusés"],["suspendu","Suspendus"]].map(([k,l])=>`<button class="chip ${st===k?"on":""}" data-adm-status="${k}">${l}</button>`).join("")}</div>
     <h3 style="margin-bottom:10px">Serveurs (${fs.length})</h3>
-    <div class="grid">${fs.map(s=>`<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${srvIcon(s.name,36)}<h3 style="flex:1">${esc(s.name)}</h3>
-      <label class="switch"><input type="checkbox" data-field="hub_servers:${esc(s.id)}:month" ${s.month?"checked":""}> Serveur du mois</label>
-      <button class="btn btn-ghost btn-sm" data-decide="hub_servers:${esc(s.id)}:suspendu">Suspendre</button></div>
-      <div class="tags" style="margin-top:12px">${chips("server",s.id)||`<span class="muted" style="font-size:13.5px">Crée d'abord un badge dans l'onglet Badges.</span>`}</div></div>`).join("")||`<div class="empty">Aucun serveur.</div>`}</div>
+    <div class="grid">${fs.map(s=>`<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${srvIcon(s.name,36)}<h3 style="flex:1">${esc(s.name)}</h3><button class="btn btn-ghost btn-sm" data-open-server="${esc(s.id)}">Voir la fiche</button></div>
+      ${adminServerTools(s,B)}</div>`).join("")||`<div class="empty">Aucun serveur.</div>`}</div>
     <h3 style="margin:28px 0 10px">Membres (${fp.length})</h3>
-    <div class="grid">${fp.map(p=>{const P=B.people.get(String(p.id))||{}; const qd=new Set(P.quests||[]); return `<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="avatar" style="background:${color(p.name)}">${initials(p.name)}</span><h3 style="flex:1">${esc(p.name)} ${p.is_admin?`<span class="tag brand">Admin</span>`:""}</h3>
-      <label class="switch"><input type="checkbox" data-field="hub_profiles:${esc(p.id)}:verified" ${p.verified?"checked":""}> Expériences vérifiées</label>
-      <select data-plan-select="${esc(p.id)}" style="width:auto">${PLAN_NAMES.map(n=>`<option ${p.plan===n?"selected":""}>${n}</option>`).join("")}</select>
-      <button class="btn btn-ghost btn-sm" data-decide="hub_profiles:${esc(p.id)}:suspendu">Suspendre</button></div>
-      <div class="tags" style="margin-top:10px">${sysBadges(P)}</div>
-      <div class="admin-row"><span class="muted">Certifications</span>${CERTS.map(([k,l])=>`<button class="chip ${(P.certs||[]).includes(k)?"on":""}" data-cert="${esc(p.id)}:${k}">${esc(l)}</button>`).join("")}</div>
-      <div class="admin-row"><span class="muted">Quêtes staff (${QUESTS.filter(([k])=>k==="profil"||qd.has(k)).length}/${QUESTS.length})</span>${QUESTS.filter(([k])=>k!=="profil").map(([k,l])=>`<button class="chip ${qd.has(k)?"on":""}" title="${esc(l)}" data-quest="${esc(p.id)}:${k}">${esc(k)}</button>`).join("")}</div>
-      <div class="admin-row"><span class="muted">Badges perso</span>${chips("profile",p.id)}</div></div>`;}).join("")||`<div class="empty">Aucun membre.</div>`}</div>`;
+    <div class="grid">${fp.map(p=>`<div class="card"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="avatar" style="background:${color(p.name)}">${initials(p.name)}</span><h3 style="flex:1">${esc(p.name)} ${p.is_admin?`<span class="tag brand">Admin</span>`:""}</h3><button class="btn btn-ghost btn-sm" data-open-profile="${esc(p.id)}">Voir le profil</button></div>
+      <div class="tags" style="margin-top:10px">${sysBadges(B.people.get(String(p.id)))}</div>
+      ${adminProfileTools(p,B)}</div>`).join("")||`<div class="empty">Aucun membre.</div>`}</div>`;
   } else if(sub==="badges"){
     const B=await api.badges();
     body=`<h2>Badges personnalisés</h2><p class="muted" style="margin:6px 0 18px">Crée des badges pour mettre en avant des serveurs ou des membres, puis attribue-les dans l'onglet Gestion.</p>
@@ -1135,6 +1238,14 @@ async function vAdmin(sub){
     const all=await api.contracts(true);
     body=`<h2>Tous les contrats</h2><p class="muted" style="margin:6px 0 18px">La Team Hub voit tous les contrats et a accès à tous les tickets. En cas de litige, tu peux rompre un contrat.</p>
     <div class="grid">${all.length?all.map(c=>contractCard(c,null,true)).join(""):`<div class="empty">Aucun contrat.</div>`}</div>`;
+  } else if(sub==="journal"){
+    const list=await api.logs(true,200), k=state.logKind||"tout";
+    const shown=list.filter(l=>k==="tout"||l.kind===k);
+    body=`<h2>Journal</h2><p class="muted" style="margin:6px 0 14px">Tout ce qui se passe sur le site, écrit automatiquement par la base de données. Les lignes « public » apparaissent aussi dans le coin Activité. Les entrées de plus de 120 jours sont effacées.</p>
+    <div class="toolbar" style="margin:0 0 14px">${[["tout","Tout"],...Object.keys(KIND_ICO).map(x=>[x,x[0].toUpperCase()+x.slice(1)])].map(([x,l])=>`<button class="chip ${k===x?"on":""}" data-log-kind="${x}">${l}</button>`).join("")}</div>
+    <div class="table-card"><table><thead><tr><th>Quand</th><th>Type</th><th>Événement</th><th>Par</th><th>Visibilité</th></tr></thead><tbody>
+    ${shown.map(l=>`<tr><td class="muted" style="white-space:nowrap">${esc(ago(l.created_at))}</td><td>${KIND_ICO[l.kind]||""} ${esc(l.kind)}</td><td>${esc(l.message)}</td><td class="muted">${esc(l.actor_name||"auto")}</td><td>${l.public?`<span class="tag ok">public</span>`:`<span class="tag">staff</span>`}</td></tr>`).join("")||`<tr><td colspan="5" class="muted">Rien pour le moment.</td></tr>`}
+    </tbody></table></div>`;
   } else if(sub==="commandes"){
     const o=await api.orders();
     body=`<h2>Commandes du Studio</h2><p class="muted" style="margin:6px 0 18px">Elles arrivent aussi dans le salon des commandes du Discord. Passer une commande en « Livrée » donne le badge Client Studio au client.</p>
@@ -1142,7 +1253,7 @@ async function vAdmin(sub){
     ${o.map(x=>`<tr><td>${esc(date(x.created_at))}</td><td><b>${esc(x.service)}</b></td><td>${esc(x.theme)}</td><td>${esc(x.colors)}</td><td>${esc(x.size)}</td><td class="muted">${esc(x.details)}</td><td><select data-order-status="${esc(x.id)}" style="width:auto;padding:6px 8px">${ORDER_STATUS.map(([k,l])=>`<option value="${k}" ${x.status===k?"selected":""}>${l}</option>`).join("")}</select></td></tr>`).join("")||`<tr><td colspan="7" class="muted">Aucune commande.</td></tr>`}
     </tbody></table></div>`;
   }
-  const L=[["serveurs",`Serveurs à vérifier`,ps.length],["profils","Profils à vérifier",pp.length],["gestion","Gestion et badges"],["badges","Badges"],["annonces","Annonces"],["contrats","Contrats"],["commandes","Commandes"]];
+  const L=[["serveurs",`Serveurs à vérifier`,ps.length],["profils","Profils à vérifier",pp.length],["gestion","Membres et serveurs"],["badges","Badges"],["annonces","Annonces"],["contrats","Contrats"],["commandes","Commandes"],["journal","Journal"]];
   return `<section><div class="wrap dash">
     <aside class="side card" style="padding:12px">
       <div class="eyebrow" style="padding:6px 12px 10px">Panneau admin</div>
@@ -1201,12 +1312,19 @@ async function render(){
   $("#navRight").innerHTML=navRight();
   const views={"":vHome,recrutement:vRecrutement,talents:vTalents,serveurs:vServeurs,formules:vFormules,studio:vStudio,espace:()=>vEspace(parts[1]),admin:()=>vAdmin(parts[1]),faq:vFaq,legal:vLegal,regles:vRegles};
   $("#app").innerHTML=await (views[r]||vHome)();
+  await refreshModal();
+  renderActivity();
 }
 let lastRoute="";
 window.addEventListener("hashchange",()=>{const r=route()[0];if(r!==lastRoute){state.filter="Tous";state.search="";lastRoute=r;}render();window.scrollTo(0,0)});
 
 /* ============================== Actions ============================== */
-const ACT="[data-slot],[data-tag],[data-open-profile],[data-open-server],[data-propose-contract],[data-cact],[data-cdetail],[data-review],[data-cert],[data-quest],[data-login],[data-logout],[data-filter],[data-plantab],[data-plan],[data-apply],[data-contact],[data-new-listing],[data-del-listing],[data-claim],[data-edit-server],[data-decide],[data-refuse],[data-badge],[data-del-badge],[data-close]";
+const ACT="[data-adm-status],[data-log-kind],[data-slot],[data-tag],[data-open-profile],[data-open-server],[data-propose-contract],[data-cact],[data-cdetail],[data-review],[data-cert],[data-quest],[data-login],[data-logout],[data-filter],[data-plantab],[data-plan],[data-apply],[data-contact],[data-new-listing],[data-del-listing],[data-claim],[data-edit-server],[data-decide],[data-refuse],[data-badge],[data-del-badge],[data-close]";
+document.addEventListener("click", e=>{
+  if(e.target.closest("[data-act]")){ const pn=$("#actPanel"); pn.classList.toggle("open"); $(".act-pill").classList.toggle("hidden",pn.classList.contains("open")); renderActivity(); return; }
+  if(e.target.closest("[data-actall]")){ state.actAll=!state.actAll; renderActivity(); return; }
+});
+setInterval(renderActivity,60000);
 document.addEventListener("click", e=>{
   const m=$("#umenu"); if(!m) return;
   if(e.target.closest("[data-umenu]")){ e.preventDefault(); m.classList.toggle("open"); }
@@ -1218,9 +1336,11 @@ document.addEventListener("click", async e=>{
   const d=t.dataset;
   if(t.hasAttribute("data-close")) return closeModal();
   if(d.slot){ t.classList.toggle("on"); return; }
+  if(d.admStatus){ state.adminStatus=d.admStatus; return render(); }
+  if(d.logKind){ state.logKind=d.logKind; return render(); }
   if(d.tag){ const box=t.closest("[data-tagbox]"); if(!t.classList.contains("on")&&box.querySelectorAll(".on").length>=3) return toast("3 tags maximum"); t.classList.toggle("on"); return; }
-  if(d.openProfile){ e.stopPropagation(); const [tl,B]=await Promise.all([api.talent(d.openProfile),api.badges()]); if(!tl) return toast("Profil introuvable ou pas encore validé"); return openModal(profileModal(tl,B),true); }
-  if(d.openServer){ const [list,B]=await Promise.all([api.servers(),api.badges()]); const sv=list.find(x=>String(x.id)===d.openServer); if(sv) openModal(await serverModal(sv,B),true); return; }
+  if(d.openProfile){ e.stopPropagation(); $("#modal").scrollTop=0; return openProfile(d.openProfile); }
+  if(d.openServer){ $("#modal").scrollTop=0; return openServer(d.openServer); }
   if(d.proposeContract){
     if(needLogin())return;
     const mine=(await api.myServers()).filter(x=>x.status==="valide");
@@ -1272,7 +1392,7 @@ document.addEventListener("click", async e=>{
       <div class="foot"><button type="button" class="btn btn-ghost" data-close>Annuler</button><button class="btn btn-primary" type="submit">Envoyer en vérification</button></div></form>`);
   }
   if(d.decide){ const [table,id,status="valide"]=d.decide.split(":"); if(await api.decide(table,id,status)) render(); return; }
-  if(d.refuse){ const [table,id]=d.refuse.split(":"); return openModal(`<h3>Refuser</h3><form data-refuse-form data-t="${esc(table)}" data-id="${esc(id)}"><div class="row"><label>Motif (envoyé à la personne sur Discord)</label><textarea name="reason" required maxlength="300" placeholder="ex. Pas de lien dans la description, merci de le retirer."></textarea></div><div class="foot"><button type="button" class="btn btn-ghost" data-close>Annuler</button><button class="btn btn-primary" type="submit">Refuser</button></div></form>`); }
+  if(d.refuse){ const [table,id]=d.refuse.split(":"); state.afterRefuse=state.modalRef; state.modalRef=null; return openModal(`<h3>Refuser</h3><form data-refuse-form data-t="${esc(table)}" data-id="${esc(id)}"><div class="row"><label>Motif (envoyé à la personne sur Discord)</label><textarea name="reason" required maxlength="300" placeholder="ex. Pas de lien dans la description, merci de le retirer."></textarea></div><div class="foot"><button type="button" class="btn btn-ghost" data-close>Annuler</button><button class="btn btn-primary" type="submit">Refuser</button></div></form>`); }
   if(d.badge){ const [bid,type,id,on]=d.badge.split(":"); if(await api.toggleBadge(bid,type,id,on==="1")) render(); return; }
   if(d.delBadge){ if(await api.deleteBadge(d.delBadge)) render(); return; }
   if(d.cert||d.quest){
@@ -1290,8 +1410,8 @@ document.addEventListener("click", async e=>{
 });
 document.addEventListener("change", async e=>{
   const t=e.target;
-  if(t.dataset.field){ const [table,id,field]=t.dataset.field.split(":"); await api.setField(table,id,{[field]:t.checked}); }
-  if(t.dataset.planSelect){ await api.setField("hub_profiles",t.dataset.planSelect,{plan:t.value}); }
+  if(t.dataset.field){ const [table,id,field]=t.dataset.field.split(":"); await api.setField(table,id,{[field]:t.checked}); if(DEMO&&field==="month"&&t.checked) demoLog("badge",`${D.servers.find(x=>x.id==id)?.name} est le Serveur du mois`,true); render(); }
+  if(t.dataset.planSelect){ await api.setField("hub_profiles",t.dataset.planSelect,{plan:t.value}); render(); }
   if(t.dataset.orderStatus){ await api.orderStatus(t.dataset.orderStatus,t.value); }
 });
 function liveSearch(e,key,sel){ state[key]=e.target.value; clearTimeout(window._s); window._s=setTimeout(async()=>{const pos=e.target.selectionStart; await render(); const i=$(sel); if(i){i.focus(); i.setSelectionRange(pos,pos);}},250); }
@@ -1335,7 +1455,7 @@ document.addEventListener("submit", async e=>{
   }
   else if(f.matches("[data-cact-form]")){ if(await api.contractAction(f.dataset.id,f.dataset.action,d.reason)){ closeModal(); render(); } }
   else if(f.matches("[data-review-form]")){ if(await api.review(f.dataset.target,d.rating,d.comment)) closeModal(); }
-  else if(f.matches("[data-refuse-form]")){ if(await api.decide(f.dataset.t,f.dataset.id,"refuse",d.reason)){ closeModal(); render(); } }
+  else if(f.matches("[data-refuse-form]")){ if(await api.decide(f.dataset.t,f.dataset.id,"refuse",d.reason)){ closeModal(); if(state.afterRefuse){ const r=state.afterRefuse; state.afterRefuse=null; r.type==="profile"?await openProfile(r.id):await openServer(r.id); } render(); } }
   else if(f.matches("[data-new-badge]")){ if(await api.createBadge({emoji:d.emoji,label:d.label,color:safeColor(d.color)})) render(); }
   else if(f.matches("[data-order]")){ if(needLogin()) return; if(await api.order(d)) f.reset(); }
 });
