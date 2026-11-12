@@ -1,5 +1,5 @@
 -- =====================================================================
--- Le Hub — schéma Supabase (v4 : profils détaillés, stats serveurs, contrats)
+-- Le Hub — schéma Supabase (v6 : avatar/bannière, salon de logs, revalidation)
 -- Toutes les tables commencent par hub_ : elles peuvent vivre dans le
 -- MÊME projet Supabase que le dashboard Protect sans rien toucher.
 -- À coller dans Supabase > SQL Editor > New query, puis "Run".
@@ -55,6 +55,12 @@ alter table public.hub_profiles drop column if exists has_link;
 alter table public.hub_profiles add column has_link boolean generated always as
   ((coalesce(bio,'') || ' ' || coalesce(about,'')) ~* '(https?://|www\.|discord\.gg|discord\.com/invite)') stored;
 
+-- Avatar / bannière Discord (mis à jour par le bot et à la connexion), suivi des vérifications
+alter table public.hub_profiles add column if not exists banner_url text;
+alter table public.hub_profiles add column if not exists accent_color text;
+alter table public.hub_profiles add column if not exists was_validated boolean not null default false;  -- déjà validé une fois = la prochaine demande est une modification
+alter table public.hub_profiles add column if not exists decided_by text;                              -- qui a validé / refusé
+
 -- Fiches serveurs : créées uniquement par la fonction claim-server
 -- (qui vérifie auprès de Discord que la personne gère bien le serveur)
 create table if not exists public.hub_servers (
@@ -94,6 +100,9 @@ alter table public.hub_servers add column if not exists boost_tier int;
 alter table public.hub_servers add column if not exists guild_created_at timestamptz;
 alter table public.hub_servers add column if not exists messages_24h int;
 alter table public.hub_servers add column if not exists stats_updated_at timestamptz;
+
+alter table public.hub_servers add column if not exists was_validated boolean not null default false;
+alter table public.hub_servers add column if not exists decided_by text;
 
 -- Historique jour par jour (courbe sur 30 jours)
 create table if not exists public.hub_server_stats (
@@ -163,6 +172,19 @@ create table if not exists public.hub_contracts (
   created_at timestamptz not null default now(),
   check (talent_id <> founder_id)
 );
+
+-- Journal d'activité : actualités publiques + logs réservés à la Team Hub
+create table if not exists public.hub_logs (
+  id bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  kind text not null,                 -- serveur, profil, badge, annonce, contrat, commande, membre
+  message text not null,
+  public boolean not null default false,
+  actor_name text,                    -- qui a fait l'action (vide = automatique / bot)
+  target_type text,
+  target_id text
+);
+create index if not exists hub_logs_created on public.hub_logs (created_at desc);
 
 -- Avis dans les deux sens
 create table if not exists public.hub_reviews (
@@ -265,10 +287,21 @@ create or replace function public.hub_guard_profiles() returns trigger
 language plpgsql set search_path = public as $$
 begin
   if public.hub_is_trusted() then
-    -- une décision du staff (site ou Discord) : le bot prévient la personne
+    -- un admin qui modifie le contenu de SON propre profil passe aussi par la vérification
+    -- (comme tout le monde : pratique pour tester le salon de vérification)
+    if auth.uid() = new.id and new.status = old.status and
+       (new.name, new.kind, new.skills, new.bio, new.dispo, new.paid, new.portfolio,
+        new.about, new.skill_levels, new.languages, new.schedule, new.paid_modes, new.rate, new.level)
+       is distinct from
+       (old.name, old.kind, old.skills, old.bio, old.dispo, old.paid, old.portfolio,
+        old.about, old.skill_levels, old.languages, old.schedule, old.paid_modes, old.rate, old.level) then
+      new.status := 'en_attente'; new.notified_staff := false; new.refusal_reason := null;
+    end if;
+    -- une décision du staff (site ou Discord) : le bot prévient la personne et range la demande dans les logs
     if new.status is distinct from old.status and new.status in ('valide','refuse','suspendu') then
       new.notified_user := false;
     end if;
+    if new.status = 'valide' then new.was_validated := true; end if;
     new.updated_at := now(); return new;
   end if;
   new.id := old.id; new.discord_id := old.discord_id; new.avatar_url := old.avatar_url;
@@ -276,6 +309,8 @@ begin
   new.status := old.status; new.refusal_reason := old.refusal_reason;
   new.notified_staff := old.notified_staff; new.staff_message_id := old.staff_message_id; new.notified_user := old.notified_user;
   new.certs := old.certs; new.quests := old.quests; new.team := old.team;
+  new.banner_url := old.banner_url; new.accent_color := old.accent_color;
+  new.was_validated := old.was_validated; new.decided_by := old.decided_by;
   if (new.name, new.kind, new.skills, new.bio, new.dispo, new.paid, new.portfolio,
       new.about, new.skill_levels, new.languages, new.schedule, new.paid_modes, new.rate, new.level)
      is distinct from
@@ -294,10 +329,11 @@ create or replace function public.hub_guard_servers() returns trigger
 language plpgsql set search_path = public as $$
 begin
   if public.hub_is_trusted() then
-    -- une décision du staff (site ou Discord) : le bot prévient la personne
+    -- une décision du staff (site ou Discord) : le bot prévient la personne et range la demande dans les logs
     if new.status is distinct from old.status and new.status in ('valide','refuse','suspendu') then
       new.notified_user := false;
     end if;
+    if new.status = 'valide' then new.was_validated := true; end if;
     new.updated_at := now(); return new;
   end if;
   new.guild_id := old.guild_id; new.owner_id := old.owner_id; new.name := old.name; new.icon := old.icon;
@@ -305,6 +341,7 @@ begin
   new.protect := old.protect; new.pro := old.pro; new.month := old.month;
   new.status := old.status; new.refusal_reason := old.refusal_reason;
   new.notified_staff := old.notified_staff; new.staff_message_id := old.staff_message_id; new.notified_user := old.notified_user;
+  new.was_validated := old.was_validated; new.decided_by := old.decided_by;
   new.bots := old.bots; new.channels := old.channels; new.roles := old.roles; new.boosts := old.boosts;
   new.boost_tier := old.boost_tier; new.guild_created_at := old.guild_created_at;
   new.messages_24h := old.messages_24h; new.stats_updated_at := old.stats_updated_at;
@@ -389,6 +426,146 @@ end $$;
 revoke all on function public.hub_contract_action(bigint, text, text) from public;
 grant execute on function public.hub_contract_action(bigint, text, text) to authenticated;
 
+
+-- ---------------------------------------------------------------------
+-- Journal d'activité : écrit automatiquement par la base, personne ne peut tricher
+-- ---------------------------------------------------------------------
+create or replace function public.hub_log(p_kind text, p_msg text, p_public boolean, p_type text default null, p_id text default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare who text;
+begin
+  select name into who from public.hub_profiles where id = auth.uid();
+  insert into public.hub_logs(kind, message, public, actor_name, target_type, target_id)
+  values (p_kind, p_msg, p_public, who, p_type, p_id);
+  delete from public.hub_logs where created_at < now() - interval '120 days';
+end $$;
+revoke all on function public.hub_log(text, text, boolean, text, text) from public;
+
+create or replace function public.hub_log_servers() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    perform public.hub_log('serveur', 'Nouvelle fiche serveur à vérifier : ' || new.name, false, 'server', new.id::text);
+  elsif new.status is distinct from old.status then
+    if new.status = 'valide' then
+      perform public.hub_log('serveur', 'Nouveau serveur vérifié : ' || new.name, true, 'server', new.id::text);
+    elsif new.status = 'en_attente' then
+      perform public.hub_log('serveur', 'Fiche modifiée, à revérifier : ' || new.name, false, 'server', new.id::text);
+    else
+      perform public.hub_log('serveur', 'Fiche ' || new.name || ' : ' || new.status || coalesce(' (' || new.refusal_reason || ')', ''), false, 'server', new.id::text);
+    end if;
+  end if;
+  if tg_op = 'UPDATE' and new.month and not old.month then
+    perform public.hub_log('badge', new.name || ' est le Serveur du mois', true, 'server', new.id::text);
+  end if;
+  return null;
+end $$;
+drop trigger if exists hub_log_servers on public.hub_servers;
+create trigger hub_log_servers after insert or update on public.hub_servers
+  for each row execute function public.hub_log_servers();
+
+create or replace function public.hub_log_profiles() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare c text;
+begin
+  if tg_op = 'INSERT' then
+    perform public.hub_log('membre', 'Nouveau membre inscrit : ' || new.name, false, 'profile', new.id::text);
+    return null;
+  end if;
+  if new.status is distinct from old.status then
+    if new.status = 'valide' then
+      perform public.hub_log('profil', 'Nouveau profil vérifié : ' || new.name, true, 'profile', new.id::text);
+    elsif new.status = 'en_attente' then
+      perform public.hub_log('profil', 'Profil à vérifier : ' || new.name, false, 'profile', new.id::text);
+    else
+      perform public.hub_log('profil', 'Profil ' || new.name || ' : ' || new.status || coalesce(' (' || new.refusal_reason || ')', ''), false, 'profile', new.id::text);
+    end if;
+  end if;
+  foreach c in array coalesce(new.certs, '{}') loop
+    if not (c = any(coalesce(old.certs, '{}'))) then
+      perform public.hub_log('badge', new.name || ' est maintenant ' ||
+        case c when 'staff' then 'Staff certifié' when 'dev_bot' then 'Développeur bot certifié'
+               when 'dev_site' then 'Développeur site certifié' when 'graphiste' then 'Graphiste certifié' else c end,
+        true, 'profile', new.id::text);
+    end if;
+  end loop;
+  if new.plan is distinct from old.plan then
+    perform public.hub_log('badge', 'Formule de ' || new.name || ' : ' || old.plan || ' → ' || new.plan, false, 'profile', new.id::text);
+  end if;
+  if new.verified is distinct from old.verified then
+    perform public.hub_log('badge', 'Expériences vérifiées ' || case when new.verified then 'données à ' else 'retirées à ' end || new.name, false, 'profile', new.id::text);
+  end if;
+  if new.is_admin is distinct from old.is_admin then
+    perform public.hub_log('membre', new.name || case when new.is_admin then ' devient admin du site' else ' n''est plus admin du site' end, false, 'profile', new.id::text);
+  end if;
+  return null;
+end $$;
+drop trigger if exists hub_log_profiles on public.hub_profiles;
+create trigger hub_log_profiles after insert or update on public.hub_profiles
+  for each row execute function public.hub_log_profiles();
+
+create or replace function public.hub_log_badge_links() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare b text; t text; r record;
+begin
+  r := coalesce(new, old);
+  select label into b from public.hub_badges where id = r.badge_id;
+  if r.target_type = 'server' then select name into t from public.hub_servers where id::text = r.target_id;
+  else select name into t from public.hub_profiles where id::text = r.target_id; end if;
+  if tg_op = 'INSERT' then
+    perform public.hub_log('badge', coalesce(t, '?') || ' reçoit le badge « ' || coalesce(b, '?') || ' »', true, r.target_type, r.target_id);
+  else
+    perform public.hub_log('badge', 'Badge « ' || coalesce(b, '?') || ' » retiré à ' || coalesce(t, '?'), false, r.target_type, r.target_id);
+  end if;
+  return null;
+end $$;
+drop trigger if exists hub_log_badge_links on public.hub_badge_links;
+create trigger hub_log_badge_links after insert or delete on public.hub_badge_links
+  for each row execute function public.hub_log_badge_links();
+
+create or replace function public.hub_log_listings() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare srv text;
+begin
+  select name into srv from public.hub_servers where id = new.server_id;
+  perform public.hub_log('annonce', coalesce(srv, 'Un serveur') || ' recrute : ' || new.role, true, 'listing', new.id::text);
+  return null;
+end $$;
+drop trigger if exists hub_log_listings on public.hub_listings;
+create trigger hub_log_listings after insert on public.hub_listings
+  for each row execute function public.hub_log_listings();
+
+create or replace function public.hub_log_contracts() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    perform public.hub_log('contrat', 'Contrat n° ' || new.id || ' proposé : ' || new.founder_name || ' → ' || new.talent_name || ' (' || new.role || ', ' || new.server_name || ')', false, 'contract', new.id::text);
+  elsif new.status is distinct from old.status then
+    if new.status = 'accepte' then
+      perform public.hub_log('contrat', 'Nouveau contrat signé sur ' || new.server_name || ' (' || new.role || ')', true, 'contract', new.id::text);
+    end if;
+    perform public.hub_log('contrat', 'Contrat n° ' || new.id || ' : ' || new.status || coalesce(' (' || new.end_reason || ')', ''), false, 'contract', new.id::text);
+  end if;
+  return null;
+end $$;
+drop trigger if exists hub_log_contracts on public.hub_contracts;
+create trigger hub_log_contracts after insert or update on public.hub_contracts
+  for each row execute function public.hub_log_contracts();
+
+create or replace function public.hub_log_orders() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    perform public.hub_log('commande', 'Nouvelle commande Studio : ' || coalesce(new.service, '?'), false, 'order', new.id::text);
+  elsif new.status is distinct from old.status and new.status = 'livree' then
+    perform public.hub_log('commande', 'Commande Studio livrée (' || coalesce(new.service, '?') || ')', true, 'order', new.id::text);
+  end if;
+  return null;
+end $$;
+drop trigger if exists hub_log_orders on public.hub_orders;
+create trigger hub_log_orders after insert or update on public.hub_orders
+  for each row execute function public.hub_log_orders();
+
 -- ---------------------------------------------------------------------
 -- 4. Vue publique des talents (seulement les profils validés)
 -- ---------------------------------------------------------------------
@@ -397,6 +574,7 @@ create view public.hub_talents as
 select p.id, p.name, p.avatar_url, p.skills, p.bio as exp, p.paid, p.dispo,
        p.verified, p.portfolio, p.created_at,
        p.about, p.skill_levels, p.languages, p.schedule, p.paid_modes, p.rate, p.level,
+       p.banner_url, p.accent_color,
        coalesce(round(avg(r.rating)::numeric, 1), 0) as rating,
        count(r.id) as reviews
 from public.hub_profiles p
@@ -430,6 +608,7 @@ alter table public.hub_badges       enable row level security;
 alter table public.hub_badge_links  enable row level security;
 alter table public.hub_server_stats enable row level security;
 alter table public.hub_contracts    enable row level security;
+alter table public.hub_logs         enable row level security;
 
 do $$ declare p record; begin
   for p in select policyname, tablename from pg_policies
@@ -489,6 +668,9 @@ create policy "proposer un contrat" on public.hub_contracts for insert
     and (select count(*) from public.hub_contracts x
          where x.founder_id = auth.uid() and x.status = 'propose') < 5);
 
+-- Journal : actualités publiques pour tous, tout le journal pour la Team Hub
+create policy "journal" on public.hub_logs for select using (public or public.hub_is_team());
+
 -- Avis
 create policy "avis visibles" on public.hub_reviews for select using (true);
 create policy "laisser un avis" on public.hub_reviews for insert
@@ -514,6 +696,10 @@ create policy "attribuer les badges" on public.hub_badge_links for all
 --    Mode développeur, puis clic droit sur ton pseudo > Copier l'identifiant)
 -- ---------------------------------------------------------------------
 -- update public.hub_profiles set is_admin = true, status = 'valide' where discord_id = 'TON_ID_DISCORD';
+
+-- Fiches et profils déjà validés avant cette version : la prochaine demande sera une « modification »
+update public.hub_profiles set was_validated = true where status = 'valide' and not was_validated;
+update public.hub_servers  set was_validated = true where status = 'valide' and not was_validated;
 
 -- ---------------------------------------------------------------------
 -- 7. Prévient l'API de Supabase que les tables ont changé (évite l'erreur
