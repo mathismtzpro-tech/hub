@@ -558,12 +558,11 @@ const api = {
     const {data}=await sb.from("hub_profiles").select("*").eq("id",state.user.id).maybeSingle(); return data;
   },
   async saveProfile(d){
-    if(DEMO){ const changed=["name","kind","bio","dispo","paid","portfolio"].some(k=>d[k]!==D.profiles[0][k])||String(d.skills)!==String(D.profiles[0].skills); Object.assign(D.profiles[0],d); if(changed&&!D.profiles[0].is_admin) D.profiles[0].status="en_attente"; return done(null,"Profil enregistré"); }
+    if(DEMO){ const changed=["name","kind","bio","dispo","paid","portfolio"].some(k=>d[k]!==D.profiles[0][k])||String(d.skills)!==String(D.profiles[0].skills); Object.assign(D.profiles[0],d); if(changed) D.profiles[0].status="en_attente"; return done(null,"Profil enregistré"); }
     const {error}=await sb.from("hub_profiles").update(d).eq("id",state.user.id);
     if(error) return done(error);
     const {data:me}=await sb.from("hub_profiles").select("status,is_admin").eq("id",state.user.id).maybeSingle();
-    return done(null, me?.status==="en_attente" ? "Profil envoyé en vérification : le staff le voit dans le salon de vérification"
-      : me?.is_admin ? "Profil enregistré (tu es admin : il est validé directement, sans passer par la vérification)" : "Profil enregistré");
+    return done(null, me?.status==="en_attente" ? "Profil envoyé en vérification : le staff le voit dans le salon de vérification" : "Profil enregistré");
   },
   async myServers(){
     if(DEMO) return D.servers.filter(s=>s.owner_id==="demo");
